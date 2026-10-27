@@ -5,14 +5,16 @@ ROOT=pathlib.Path(__file__).resolve().parents[1];ID='mipeng6';BASE='https://aoki
 def dump(name,obj):(ROOT/'data'/name).write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')))
 def norm(t):return re.sub(r'\s+','',t).replace('．','.').replace('。','.').replace('、','.')
 def useful(r,p):
- t=r['t'].strip();return r['b'][1]>p['height']*.045 and r['b'][3]<p['height']*.945 and not re.search('全真模拟试卷|单项选择题|多项选择题|下列每题给出|在每小题|全部选对|少选得|答题卡|分析题.*小题',t)
+ t=r['t'].strip();
+ if r['b'][1]>p['height']*.87 and (re.fullmatch(r'\d{1,3}',t) or re.search('配套课程|联系微信|公众号|1931637888',t)):return False
+ return r['b'][1]>p['height']*.045 and r['b'][3]<p['height']*.945 and not re.search('全真(?:模拟)?试卷|单项选择题|多项选择题|下列每题给出|在每小题|全部选对|少选得|答题卡|分析题.*小题',t)
 def head(r,p,answer=False):
- if r['b'][0]>p['width']*.18:return None
+ if r['b'][0]>p['width']*.26:return None
  m=re.match(r'^(\d{1,2})\s*[.．、。，:：]\s*(.*)',r['t'])
  if not m:return None
  no=int(m[1]);rest=m[2].strip()
  if not 1<=no<=38:return None
- if answer and not(re.match(r'[ABCDabcd](?:[^A-Za-z]|$)',rest) or re.match(r'[ABCDabcd]{2,4}(?:[^A-Za-z]|$)',rest) or '参考答案' in rest[:8]):return None
+ if answer and not(re.match(r'[ABCDabcd](?:[^A-Za-z]|$)',rest) or re.match(r'[ABCDabcd]{2,4}(?:[^A-Za-z]|$)',rest) or any(x in rest[:12] for x in ['参考答案','答案要点','答案要','答题要点'])):return None
  return no,rest
 
 def group_pages(pages,answer=False):
@@ -21,10 +23,10 @@ def group_pages(pages,answer=False):
   for r in p['rows']:
    if not useful(r,p):continue
    l={**r,'p':p['page']};h=head(l,p,answer)
-   if h and (h[0]==expected or (h[0]==1 and expected==39)):
+   if h and ((h[0]>=expected and h[0]-expected<=2) or (h[0]==1 and expected>=34)):
     if first is not None:group[first]=(current,current[0]['rest'])
-    if h[0]==1 and expected==39:groups.append(group);group={};expected=1
-    first=h[0];current=[{**l,'rest':h[1]}];expected+=1
+    if h[0]==1 and expected>=34:groups.append(group);group={};expected=1
+    first=h[0];current=[{**l,'rest':h[1]}];expected=h[0]+1
    elif first is not None:current.append(l)
  if first is not None:group[first]=(current,current[0]['rest'])
  if group:groups.append(group)
