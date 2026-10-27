@@ -1,0 +1,26 @@
+name: Verify OCR boundary samples
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  sample:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install PyMuPDF==1.26.6 rapidocr_onnxruntime==1.4.4 'numpy<3'
+      - run: |
+          python - <<'PY'
+          import sys,pathlib,urllib.request,concurrent.futures
+          sys.path.insert(0,'tools');from ocr import work
+          pathlib.Path('pdf').mkdir(exist_ok=True)
+          for kind in ['questions','answers']:urllib.request.urlretrieve('https://github.com/aokid666/zz-mipeng-2027/releases/download/source-v1/'+kind+'.pdf','pdf/'+kind+'.pdf')
+          jobs=[('questions',p,p) for p in [7,8,13,14,20,73]]+[('answers',p,88+p) for p in [5,6,7,19,20]]
+          with concurrent.futures.ProcessPoolExecutor(max_workers=4) as ex:list(ex.map(work,jobs))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ocr-samples
+          path: data/ocr
