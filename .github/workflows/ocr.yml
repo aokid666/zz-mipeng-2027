@@ -1,0 +1,47 @@
+name: Extract original scans and OCR on GitHub
+on:
+  push:
+    paths: ['tools/ocr.py', '.github/workflows/ocr.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install PyMuPDF==1.26.6 rapidocr_onnxruntime==1.4.4 'numpy<3'
+      - run: python tools/ocr.py
+      - name: Save original scans and OCR checkpoint
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data img
+          if ! git diff --cached --quiet; then git commit -m 'Extract original PNG bytes and OCR on GitHub'; git push; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mipeng-ocr
+          path: data
+      - run: |
+          mkdir -p _site
+          cp -a img data index.html .nojekyll _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: extract
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
