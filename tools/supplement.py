@@ -3,10 +3,10 @@ import concurrent.futures,csv,io,json,pathlib,re,subprocess,os
 os.environ['OMP_THREAD_LIMIT']='1'
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def work(p):
- path=ROOT/'img/mipeng6'/f'{p["page"]:03}.png'
+ p['rows']=[r for r in p['rows'] if not r.get('engine')];path=ROOT/'img/mipeng6'/f'{p["page"]:03}.png'
  raw=subprocess.check_output(['tesseract',str(path),'stdout','-l','chi_sim+eng','--psm','6','tsv'],stderr=subprocess.DEVNULL,text=True)
  groups={}
- for w in csv.DictReader(io.StringIO(raw),delimiter='\t'):
+ for w in csv.DictReader(io.StringIO(raw),delimiter='\t',quoting=csv.QUOTE_NONE):
   if not w.get('text','').strip() or int(w.get('level',0))!=5:continue
   groups.setdefault((w['block_num'],w['par_num'],w['line_num']),[]).append(w)
  extra=[]
@@ -21,5 +21,5 @@ def work(p):
  (ROOT/'data/ocr'/f'{p["page"]:03}.json').write_text(json.dumps(p,ensure_ascii=False));return len(extra)
 if __name__=='__main__':
  path=ROOT/'data/ocr-pages.json';pages=json.loads(path.read_text())
- with concurrent.futures.ProcessPoolExecutor(max_workers=4) as ex:counts=list(ex.map(work,pages))
+ with concurrent.futures.ProcessPoolExecutor(max_workers=4) as ex:counts=list(ex.map(work,[p for p in pages if not p.get('supplemented') or any('\t' in r['t'] for r in p['rows'])]))
  pages=[json.loads(p.read_text()) for p in sorted((ROOT/'data/ocr').glob('*.json'))];path.write_text(json.dumps(pages,ensure_ascii=False));print('Supplemented missing lines:',sum(counts),flush=True)
