@@ -1,0 +1,46 @@
+name: Supplement missed scan lines and validate
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: aokid666/zhengzhi-720
+          path: .site-source
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y tesseract-ocr-chi-sim tesseract-ocr-eng
+      - run: python tools/supplement.py
+      - run: python tools/build.py --site .site-source
+      - name: Persist validated bank
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if ! git diff --cached --quiet; then git commit -m 'Validate scanned exam questions against original answer key'; git fetch origin main; git merge --no-edit origin/main; git push; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mipeng-validation
+          path: data/*.json
+      - run: |
+          mkdir -p _site
+          cp -a img data index.html .nojekyll _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
